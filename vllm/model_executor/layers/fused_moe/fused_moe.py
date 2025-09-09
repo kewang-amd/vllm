@@ -1457,13 +1457,14 @@ def fused_experts_impl(
             "Hidden size mismatch")
     elif ocp_mx_scheme is not None and w1_scale is not None:
         if ocp_mx_scheme in {
-                "w_fp4_a_fp4", "w_fp4_a_fp6_e3m2", "w_fp4_a_fp6_e2m3"
+                "w_fp4_a_fp4", "w_fp4_a_fp6_e3m2", "w_fp4_a_fp6_e2m3", "w_fp4"
         }:
             # 16bit activation and fp4x2 packed weight
             assert hidden_states.size(
                 1) == w1.size(2) * 2, "hidden size mismatch"
         elif ocp_mx_scheme in {
-                "w_fp6_e3m2_a_fp6_e3m2", "w_fp6_e2m3_a_fp6_e2m3"
+                "w_fp6_e3m2_a_fp6_e3m2", "w_fp6_e2m3_a_fp6_e2m3", "w_fp6_e3m2", 
+                "w_fp6_e2m3"
         }:
             assert hidden_states.size(1) == (w1.size(2) *
                                              4) // 3, "hidden size mismatch"
@@ -1545,14 +1546,16 @@ def fused_experts_impl(
         # this dequantization step should not be done.
         if ocp_mx_scheme in {
                 OCP_MX_Scheme.w_fp4_a_fp4, OCP_MX_Scheme.w_fp4_a_fp6_e3m2,
-                OCP_MX_Scheme.w_fp4_a_fp6_e2m3
+                OCP_MX_Scheme.w_fp4_a_fp6_e2m3, OCP_MX_Scheme.w_fp4
         }:
             # Weight has to be dequantized for mxfp4 emulation.
             w1 = dequant_mxfp4(w1, w1_scale, hidden_states.dtype)
             w1_scale = None
             w2 = dequant_mxfp4(w2, w2_scale, hidden_states.dtype)
             w2_scale = None
-        elif ocp_mx_scheme == OCP_MX_Scheme.w_fp6_e3m2_a_fp6_e3m2:
+        elif ocp_mx_scheme in {
+                OCP_MX_Scheme.w_fp6_e3m2_a_fp6_e3m2, OCP_MX_Scheme.w_fp6_e3m2
+        }:
             w1 = dequant_mxfp6(w1,
                                w1_scale,
                                quant_dtype="fp6_e3m2",
@@ -1563,7 +1566,9 @@ def fused_experts_impl(
                                quant_dtype="fp6_e3m2",
                                float_dtype=hidden_states.dtype)
             w2_scale = None
-        elif ocp_mx_scheme == OCP_MX_Scheme.w_fp6_e2m3_a_fp6_e2m3:
+        elif ocp_mx_scheme in {
+                OCP_MX_Scheme.w_fp6_e2m3_a_fp6_e2m3, OCP_MX_Scheme.w_fp6_e2m3
+        }:
             w1 = dequant_mxfp6(w1,
                                w1_scale,
                                quant_dtype="fp6_e2m3",

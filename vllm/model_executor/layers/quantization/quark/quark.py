@@ -212,39 +212,70 @@ class QuarkConfig(QuantizationConfig):
 
     def _is_ocp_mx(self, weight_quant: Optional[dict[str, Any]],
                    input_quant: Optional[dict[str, Any]]) -> bool:
-        # Confirm weights and input quantized.
-        if weight_quant is None or input_quant is None:
+        # Confirm weights quantized.
+        if weight_quant is None:
             logger.debug("Quark model is not in OCP MX format: "
-                         "weight_quant or input_quant not set")
+                         "weight_quant not set")
             return False
 
-        # Input and weight qscheme needs to be per group.
-        if weight_quant.get("qscheme") != "per_group" or input_quant.get(
-                "qscheme") != "per_group":
-            logger.debug("Quark model is not in OCP MX format: not per_group")
+        # Weight qscheme needs to be per group.
+        if weight_quant.get("qscheme") != "per_group":
+            logger.debug("Quark model is not in OCP MX format: "
+                         "weight not per_group")
             return False
 
-        # Input and weight group size needs to be 32.
-        if weight_quant.get("group_size") != 32 or input_quant.get(
-                "group_size") != 32:
+        # Weight group size needs to be 32.
+        if weight_quant.get("group_size") != 32:
             logger.debug(
-                "Quark model is not in OCP MX format: not group_size=32")
+                "Quark model is not in OCP MX format: weight not group_size=32")
             return False
 
-        # Activations and weight scales need to be in e8m0 format.
-        if weight_quant.get("scale_format") != "e8m0" or input_quant.get(
-                "scale_format") != "e8m0":
+        # Weight scales need to be in e8m0 format.
+        if weight_quant.get("scale_format") != "e8m0":
             logger.debug(
-                "Quark model is not in OCP MX format: not scale_format e8m0")
+                "Quark model is not in OCP MX format: "
+                "weight not scale_format e8m0")
             return False
 
-        # Input and weight dtype needs to be fp4.
+        # Weight dtype needs to be fp4, fp6_e3m2, fp6_e2m3, fp8_e4m3 or fp8_e5m2
         if weight_quant.get("dtype") not in [
-                "fp4", "fp6_e3m2", "fp6_e2m3"
-        ] or input_quant.get("dtype") not in ["fp4", "fp6_e3m2", "fp6_e2m3"]:
+                "fp4", "fp6_e3m2", "fp6_e2m3", "fp8_e4m3", "fp8_e5m2"
+        ]:
             logger.debug("Quark model is not in OCP MX format:"
-                         " dtype not fp4, fp6_e3m2, fp6_e2m3")
+                         " weight dtype not fp4, fp6_e3m2, fp6_e2m3, "
+                         "fp8_e4m3, fp8_e5m2")
             return False
+
+        # If input_quant is provided, it must satisfy the requirements.
+        if input_quant is not None:
+            # Input qscheme needs to be per group.
+            if input_quant.get("qscheme") != "per_group":
+                logger.debug("Quark model is not in OCP MX format: "
+                             "input not per_group")
+                return False
+
+            # Input group size needs to be 32.
+            if input_quant.get("group_size") != 32:
+                logger.debug(
+                    "Quark model is not in OCP MX format: "
+                    "input not group_size=32")
+                return False
+
+            # Input scales need to be in e8m0 format.
+            if input_quant.get("scale_format") != "e8m0":
+                logger.debug(
+                    "Quark model is not in OCP MX format: "
+                    "input not scale_format e8m0")
+                return False
+
+            # Input dtype needs to be fp4, fp6_e3m2, fp6_e2m3, fp8_e4m3 or fp8_e5m2
+            if input_quant.get("dtype") not in [
+                    "fp4", "fp6_e3m2", "fp6_e2m3", "fp8_e4m3", "fp8_e5m2"
+            ]:
+                logger.debug("Quark model is not in OCP MX format:"
+                             " input dtype not fp4, fp6_e3m2, fp6_e2m3, "
+                             "fp8_e4m3, fp8_e5m2")
+                return False
 
         return True
 

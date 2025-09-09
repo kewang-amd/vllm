@@ -15,6 +15,9 @@ class OCP_MX_Scheme(str, Enum):
     w_fp4_a_fp6_e2m3 = "w_fp4_a_fp6_e2m3"
     w_fp6_e3m2_a_fp6_e3m2 = "w_fp6_e3m2_a_fp6_e3m2"
     w_fp6_e2m3_a_fp6_e2m3 = "w_fp6_e2m3_a_fp6_e2m3"
+    w_fp4 = "w_fp4"
+    w_fp6_e3m2 = "w_fp6_e3m2"
+    w_fp6_e2m3 = "w_fp6_e2m3"
 
     @classmethod
     def from_quant_dtype(cls, input_dtype: str, weight_dtype: str):
@@ -28,6 +31,12 @@ class OCP_MX_Scheme(str, Enum):
             return cls.w_fp6_e3m2_a_fp6_e3m2
         elif input_dtype == "fp6_e2m3" and weight_dtype == "fp6_e2m3":
             return cls.w_fp6_e2m3_a_fp6_e2m3
+        elif input_dtype is None and weight_dtype == "fp4":
+            return cls.w_fp4
+        elif input_dtype is None and weight_dtype == "fp6_e3m2":
+            return cls.w_fp6_e3m2
+        elif input_dtype is None and weight_dtype == "fp6_e2m3":
+            return cls.w_fp6_e2m3
         else:
             raise NotImplementedError(
                 f"input_dtype='{input_dtype}' and"

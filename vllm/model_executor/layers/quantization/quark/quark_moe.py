@@ -253,25 +253,36 @@ class QuarkW8A8Fp8MoEMethod(QuarkMoEMethod):
 
 class QuarkOCP_MX_MoEMethod(QuarkMoEMethod):
 
-    def __init__(self, weight_config: dict[str, Any], input_config: dict[str,
-                                                                         Any]):
+    def __init__(self, weight_config: dict[str, Any], input_config: Optional[dict[str,Any]] = None):
         self.weight_quant = weight_config
         self.input_quant = input_config
         self.out_dtype = torch.get_default_dtype()
 
         weight_qscheme = self.weight_quant.get("qscheme")
-        input_qscheme = self.input_quant.get("qscheme")
-        if not (weight_qscheme == "per_group"
-                and input_qscheme == "per_group"):
-            raise ValueError(
-                "For MX(FP4) Fused MoE layers, only per-group scales "
-                "for weights and activations are supported. Found "
-                f"{weight_qscheme}, {input_qscheme}")  # noqa E501
+        
+        # Only validate input_config if it's provided
+        if self.input_quant is not None:
+            input_qscheme = self.input_quant.get("qscheme")
+            if not (weight_qscheme == "per_group"
+                    and input_qscheme == "per_group"):
+                raise ValueError(
+                    "For MX(FP4) Fused MoE layers, only per-group scales "
+                    "for weights and activations are supported. Found "
+                    f"{weight_qscheme}, {input_qscheme}")  # noqa E501
 
-        self.static_input_scales = not self.input_quant.get("is_dynamic")
+            self.static_input_scales = not self.input_quant.get("is_dynamic")
+            self.input_dtype = self.input_quant["dtype"]
+        else:
+            # Set defaults when input_config is None
+            if weight_qscheme != "per_group":
+                raise ValueError(
+                    "For MX(FP4) Fused MoE layers, weight qscheme must be "
+                    f"per_group. Found {weight_qscheme}")
+            
+            self.static_input_scales = False  # Default to dynamic
+            self.input_dtype = None
 
         self.weight_dtype = self.weight_quant["dtype"]
-        self.input_dtype = self.input_quant["dtype"]
 
         self.ocp_mx_scheme = OCP_MX_Scheme.from_quant_dtype(
             self.input_dtype, self.weight_dtype)

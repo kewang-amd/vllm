@@ -27,14 +27,21 @@ __all__ = ["QuarkOCP_MX"]
 class QuarkOCP_MX(QuarkScheme):
 
     def __init__(self, weight_quant_spec: dict[str, Any],
-                 input_quant_spec: dict[str, Any]):
+                 input_quant_spec: Optional[dict[str, Any]] = None):
         self.out_dtype = torch.get_default_dtype()
         self.qscheme = "per_group"
         self.weight_quant_spec = weight_quant_spec
         self.input_quant_spec = input_quant_spec
 
         self.weight_dtype = weight_quant_spec["dtype"]
-        self.input_dtype = input_quant_spec["dtype"]
+        
+        # Handle input_quant_spec being None
+        if input_quant_spec is not None:
+            self.input_dtype = input_quant_spec["dtype"]
+            self.static_input_scales = not input_quant_spec.get("is_dynamic")
+        else:
+            self.input_dtype = None
+            self.static_input_scales = False  # Default to dynamic
 
         self.ocp_mx_scheme = OCP_MX_Scheme.from_quant_dtype(
             self.input_dtype, self.weight_dtype)
@@ -54,13 +61,15 @@ class QuarkOCP_MX(QuarkScheme):
             self.dequant_func = partial(dequant_mxfp6,
                                         quant_dtype=self.weight_dtype)
 
-        if self.input_dtype == "fp4":
-            self.quant_dequant_func = quant_dequant_mxfp4
+        # Only set quant_dequant_func if input_dtype is available
+        if self.input_dtype is not None:
+            if self.input_dtype == "fp4":
+                self.quant_dequant_func = quant_dequant_mxfp4
+            else:
+                self.quant_dequant_func = partial(quant_dequant_mxfp6,
+                                                  quant_dtype=self.input_dtype)
         else:
-            self.quant_dequant_func = partial(quant_dequant_mxfp6,
-                                              quant_dtype=self.input_dtype)
-
-        self.static_input_scales = not input_quant_spec.get("is_dynamic")
+            self.quant_dequant_func = None
 
         if self.static_input_scales:
             raise NotImplementedError(
@@ -160,7 +169,11 @@ class QuarkOCP_MX(QuarkScheme):
             else:
                 dq_w = self.dq_w
 
-            qdq_x = self.quant_dequant_func(x)
+            # Only apply input quantization if quant_dequant_func is available
+            if self.quant_dequant_func is not None:
+                qdq_x = self.quant_dequant_func(x)
+            else:
+                qdq_x = x  # Use input as-is if no input quantization
             return F.linear(qdq_x, dq_w, bias)
         else:
             raise NotImplementedError()
