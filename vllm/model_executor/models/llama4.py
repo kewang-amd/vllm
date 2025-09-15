@@ -697,6 +697,9 @@ class Llama4ForCausalLM(LlamaForCausalLM):
             elif w.dtype == torch.float8_e4m3fn and is_weight_scale \
                 and w.shape[1] * 16 == attn_out:
                 attn_out = attn_out // 16
+            elif is_weight_scale and w.dtype == torch.uint8 \
+                and w.shape[1] * 32 == attn_out:
+                attn_out = attn_out // 32
 
             return w.view(n_heads, attn_in // n_heads // 2, 2,
                           attn_out).transpose(1, 2).reshape(attn_in, attn_out)
@@ -705,17 +708,20 @@ class Llama4ForCausalLM(LlamaForCausalLM):
 
         # Permute Q/K weights and weight block scales for rotary embedding
         is_weight = modules[-1] == "weight"
-        is_nvfp4_weight_scale = (modules[-1] == "weight_scale" and
-                                 loaded_weight.dtype == torch.float8_e4m3fn)
+        # is_weight_scale = modules[-1] == "weight_scale" and 
+        #     loaded_weight.dtype == torch.uint8
+        is_weight_scale = (modules[-1] == "weight_scale" and
+                                 (loaded_weight.dtype == torch.float8_e4m3fn or
+                                  loaded_weight.dtype == torch.uint8))
 
-        if is_weight or is_nvfp4_weight_scale:
+        if is_weight or is_weight_scale:
             if ("wk" in modules or "k_proj" in modules):
                 loaded_weight = permute(loaded_weight,
                                         self.config.num_key_value_heads,
-                                        is_nvfp4_weight_scale)
+                                        is_weight_scale)
             elif ("wq" in modules or "q_proj" in modules):
                 loaded_weight = permute(loaded_weight,
                                         self.config.num_attention_heads,
-                                        is_nvfp4_weight_scale)
+                                        is_weight_scale)
 
         return name, loaded_weight
